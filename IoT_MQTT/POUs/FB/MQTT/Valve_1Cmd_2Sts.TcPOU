@@ -1,0 +1,324 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="Valve_1Cmd_2Sts" Id="{90a6c314-57fb-4663-9a9e-37a5cb2feb1b}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Valve_1Cmd_2Sts
+VAR_INPUT
+	WorkCenter	: STRING(40);
+	LineName 	: STRING(40);
+	PlantCode	: STRING(40);
+	MachineName : STRING(40);
+	StationName : STRING(40);
+	DeviceName 	: STRING(40);
+	Valve_Ext_Cmd : BOOL;
+	Valve_Ext_Sts : BOOL;
+	//Valve_Ret_Cmd : BOOL;
+	Valve_Ret_Sts : BOOL;
+	TimeStamp : ULINT;
+	
+	Enable:		BOOL;
+END_VAR
+VAR_OUTPUT
+(* State *)
+	Valve_Ext_Cmd_Out : BOOL;
+	Valve_Ext_Sts_Out : BOOL;
+	Valve_Ret_Cmd_Out : BOOL;
+	Valve_Ret_Sts_Out : BOOL;
+(* Time *)
+	Valve_CmdExt_T_Out : INT;
+	Valve_Extend_T_Out : INT;
+	Valve_CmdRet_T_Out : INT;
+	Valve_Retract_T_Out : INT;
+(* JSON *)
+	ExtCmd_T_Json : STRING(4000);
+	Extend_T_Json : STRING(4000);
+	RetCmd_T_Json : STRING(4000);
+	Retract_T_Json : STRING(4000);
+(* Publish Command *)
+	ExtCmd_T_publishMQTT : BOOL;
+	Extend_T_publishMQTT : BOOL;
+	RetCmd_T_publishMQTT : BOOL;
+	Retract_T_publishMQTT : BOOL;
+(*Topic*)
+	ExtCmd_T_sTopicPup : STRING(255);
+	Extend_T_sTopicPup : STRING(255);
+	RetCmd_T_sTopicPup : STRING(255);
+	Retract_T_sTopicPup : STRING(255);
+END_VAR
+VAR
+(* Case State *)
+	nExtState		: INT;
+	nRetState		: INT;
+(* TON *)	
+	CmdExt_time_ton	: TON;
+	Extend_time_ton	: TON;
+	CmdRet_time_ton	: TON;
+	Retract_time_ton: TON;
+	WatchDog_ExtState_ton: TON;
+	WatchDog_RetState_ton: TON;
+	ExtendStep_ton: TON;
+	CmdExt_time_temp: TIME;
+	Extend_time_temp: TIME;
+	CmdRet_time_temp: TIME;
+	Retract_time_temp: TIME;
+(* RTrig *)
+	RTrig_ExtCMD: R_TRIG;
+	RTrig_RetCMD: R_TRIG;
+	
+	FTrig_ExtCMD: F_TRIG;
+
+(* UNIX Time *)
+    timestampMilliseconds: ULINT;
+(* JSON document *)
+  	fbJson			: FB_JsonSaxWriter;
+	fbJsonDataType	: FB_JsonReadWriteDataType;
+	sJsonDocument	: STRING(4000);
+	stValues		: ValveTravelTime_DataModel;
+(* Data structure String  *)
+	tagName_ExtCmd_T : STRING := 'ExtCmd_T';
+	tagName_Extend_T : STRING := 'Extend_T';
+	tagName_RetCmd_T : STRING := 'RetCmd_T';
+	tagName_Retract_T : STRING := 'Retract_T';
+	description_ExtCmd_T : STRING := 'Extend Command Time ';
+	description_Extend_T : STRING := 'Extend Time ';
+	description_RetCmd_T : STRING := 'Retract Command Time ';
+	description_Retract_T : STRING := 'Retract Time ';
+(* Topic *)
+	temp_string01 : STRING;
+	temp_string02 : STRING;
+	bSetParameter : BOOL := TRUE;
+	
+	topicPart_ExtCmd_T : STRING := 'ExtCmd_T';
+	topicPart_Extend_T : STRING := 'Extend_T';
+	topicPart_RetCmd_T : STRING := 'RetCmd_T';
+	topicPart_Retract_T : STRING := 'Retract_T';
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Enable THEN		
+		
+		//detect rising edges
+		//RTrig_RetCMD(CLK:=Valve_Ret_Cmd);
+		RTrig_ExtCMD(CLK:=Valve_Ext_Cmd);
+		FTrig_ExtCMD(CLK:=Valve_Ext_Cmd);
+		
+		//Topic - przygotowanie pierwszej czesci sciezki
+		IF bSetParameter THEN
+			bSetParameter := FALSE;
+			(* topic *)
+			temp_string01 := CONCAT(LineName, MachineName);
+			temp_string01 := INSERT(temp_string01,'/',LEN(temp_string01)-LEN(MachineName));
+			temp_string01 := CONCAT(temp_string01, stationName);
+			temp_string01 := INSERT(temp_string01,'/',LEN(temp_string01)-LEN(StationName));
+			temp_string01 := CONCAT(temp_string01, deviceName);
+			temp_string01 := INSERT(temp_string01,'/',LEN(temp_string01)-LEN(DeviceName));
+			
+			(* Constant String in JSON *)
+			stValues.WorkCenter := WorkCenter;
+			stValues.PlantCode := PlantCode;
+			stValues.LineName := LineName;
+			stValues.MachineName := MachineName;
+			stValues.StationName := StationName;
+			stValues.ValveName  := DeviceName;
+		END_IF
+		
+		//Sekwencja wysuwania zaworu
+		CASE nExtState OF
+		0:
+			//zerowanie warunkow
+			CmdExt_time_ton.IN  := FALSE;
+			Extend_time_ton.IN  := FALSE;
+			WatchDog_ExtState_ton.IN  := FALSE;
+			ExtCmd_T_publishMQTT := FALSE;
+			Extend_T_publishMQTT := FALSE;
+			
+			IF RTrig_ExtCMD.Q THEN
+				CmdExt_time_ton.IN := TRUE; 		//uruchomienie timera CmdExt_time
+				WatchDog_ExtState_ton.IN := TRUE; 	//watchdog sekwencji
+				nExtState := nExtState + 10;
+			END_IF
+		10:
+			nExtState := nExtState + 10;
+		20:
+			//opuszczenie krancowki RetSts
+			IF NOT Valve_Ret_Sts THEN
+				CmdExt_time_ton.IN := FALSE;
+				stValues.timeStamp := TimeStamp; 		//przypisanie timeStampa dla ExtCmd_T
+				Extend_time_ton.IN := TRUE; 			//uruchomienie timera Extend_time
+				CmdExt_time_temp := CmdExt_time_ton.ET; //czas ExtCmd_T
+				nExtState := nExtState + 10;
+			END_IF
+		30:
+			Valve_CmdExt_T_Out := TIME_TO_INT(CmdExt_time_temp);//czas ExtCmd_T
+			
+			//Inicjowanie struktury JSON
+			temp_string02 := CONCAT(temp_string01, topicPart_ExtCmd_T);
+			//stValues.topic := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_ExtCmd_T));
+			ExtCmd_T_sTopicPup := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_ExtCmd_T)); //przypisanie na wyjscie
+			//stValues.deviceName := deviceName;
+			//stValues.tagname := CONCAT(deviceName,tagName_ExtCmd_T);
+			stValues.TimeType := tagName_ExtCmd_T;
+			stValues.TimeValue := TIME_TO_INT (CmdExt_time_temp);//czas ExtCmd_T
+			//stValues.description := CONCAT(description_ExtCmd_T,deviceName);
+			
+			//tworzenie pliku JSON
+			fbJson.ResetDocument();
+			
+			fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ValveTravelTime_DataModel', SIZEOF(stValues), ADR(stValues));
+		
+			fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+			ExtCmd_T_Json := sJsonDocument;
+			ExtCmd_T_publishMQTT := TRUE;
+			
+			//uruchomienie timera Extend_time
+			IF Valve_Ext_Cmd AND NOT Valve_Ret_Sts THEN
+				//ExtendStep_ton.IN := TRUE;
+				nExtState := nExtState + 10;
+			END_IF
+		40:
+		//liczenie czasu przejazdu miedzy RetSts a ExtSts
+			IF Valve_Ext_Sts THEN
+				Extend_time_ton.IN := FALSE;
+				stValues.timeStamp := TimeStamp;
+				//stValues.timeStamp := TimeStamp; //przypisanie timeStampa dla Extend_T
+				Extend_time_temp := Extend_time_ton.ET;
+				nExtState := nExtState + 10;
+			END_IF
+		50:
+			Valve_Extend_T_Out := TIME_TO_INT(Extend_time_temp);
+			WatchDog_ExtState_ton.IN:= FALSE;
+		//tworzenie pliku JSON dla Extend_T
+			temp_string02 := CONCAT(temp_string01, topicPart_Extend_T);
+			//stValues.topic := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_Extend_T));
+			Extend_T_sTopicPup :=  INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_Extend_T));; //przypisanie na wyjscie
+			//stValues.deviceName := deviceName;
+			//stValues.tagname := CONCAT(deviceName,tagName_Extend_T);
+			stValues.TimeType := tagName_Extend_T;
+			stValues.TimeValue := TIME_TO_INT (Extend_time_temp);//czas Extend_T
+			//stValues.description := CONCAT(description_Extend_T,deviceName);
+			
+			//tworzenie pliku JSON
+			fbJson.ResetDocument();
+	
+			fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ValveTravelTime_DataModel', SIZEOF(stValues), ADR(stValues));
+	
+			fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+			Extend_T_Json := sJsonDocument;
+			Extend_T_publishMQTT := TRUE;
+			nExtState := 0;
+		999:
+			//Obsluga bledow 
+		END_CASE
+		
+		//Watchdog 5 sekund, restart sekwencji do odpowiedniego kroku
+		IF WatchDog_ExtState_ton.ET > T#5S THEN
+			nExtState := 0;
+		END_IF
+		
+		//Sekwencja chowania zaworu
+		CASE nRetState OF
+		0:
+		//zerowanie warunkow
+			CmdRet_time_ton.IN  := FALSE;
+			Retract_time_ton.IN := FALSE;
+			WatchDog_RetState_ton.IN := FALSE;
+			RetCmd_T_publishMQTT := FALSE;
+			Retract_T_publishMQTT := FALSE;
+			//IF RTrig_ExtCMD.Q OR fbRTrig.Q THEN
+			(*IF(RTrig_RetCMD.Q)THEN*)
+			IF (FTrig_ExtCMD.Q) THEN
+				CmdRet_time_ton.IN := TRUE; //uruchomienie timera CmdRet_time
+				WatchDog_RetState_ton.IN := TRUE; //watchdog sekwencji
+				nRetState := nRetState + 10;
+			END_IF
+		10:
+			nRetState := nRetState +10;
+		20:
+		//opuszczenie krancowki ExtSts
+			IF NOT Valve_Ext_Sts THEN
+				CmdRet_time_ton.IN := FALSE;
+				stValues.timeStamp := TimeStamp; //przypisanie timeStampa dla RetCmd_T
+				Retract_time_ton.IN := TRUE; //uruchomienie timera Retract_time 
+				CmdRet_time_temp := CmdRet_time_ton.ET;
+				nRetState := nRetState +10;	
+			END_IF
+		30:
+			Valve_CmdRet_T_Out := TIME_TO_INT(CmdRet_time_temp);
+		//Inicjowanie struktury JSON
+			temp_string02 := CONCAT(temp_string01, topicPart_RetCmd_T);
+			//stValues.topic := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_RetCmd_T));
+			RetCmd_T_sTopicPup := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_RetCmd_T)); //przypisanie na wyjscie
+			//stValues.deviceName := deviceName;
+			//stValues.tagname := CONCAT(deviceName,tagName_RetCmd_T);
+			stValues.TimeType := tagName_RetCmd_T;
+			stValues.TimeValue := TIME_TO_INT (CmdRet_time_temp);//czas ExtCmd_T
+			//stValues.description := CONCAT(description_RetCmd_T,deviceName);
+		//tworzenie pliku JSON
+			fbJson.ResetDocument();
+	
+			fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ValveTravelTime_DataModel', SIZEOF(stValues), ADR(stValues));
+		
+			fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+			RetCmd_T_Json := sJsonDocument;
+			RetCmd_T_publishMQTT := TRUE;
+			
+			//uruchomienie timera Retract_time 
+			IF NOT Valve_Ext_Cmd AND NOT Valve_Ext_Sts THEN
+				nRetState := nRetState + 10;	
+			END_IF
+		40:
+			//liczenie czasu przejazdu miedzy ExtSts a RetSts
+			IF Valve_Ret_Sts THEN
+				Retract_time_ton.IN := FALSE;
+				stValues.timeStamp := TimeStamp;//przypisanie timeStampa dla Retract_T
+				Retract_time_temp := Retract_time_ton.ET;
+				nRetState := nRetState + 10;
+			END_IF
+		50:
+			Valve_Retract_T_Out := TIME_TO_INT(Retract_time_temp);
+			WatchDog_RetState_ton.IN:= FALSE;
+			//tworzenie pliku JSON dla Retract_T
+			
+			temp_string02 := CONCAT(temp_string01, topicPart_Retract_T);
+			//stValues.topic := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_Retract_T));
+			Retract_T_sTopicPup := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_Retract_T)); //przypisanie na wyjscie
+			//stValues.deviceName := deviceName;
+			//stValues.tagname := CONCAT(deviceName,tagName_Retract_T);
+			stValues.TimeType := tagName_Retract_T;
+			stValues.TimeValue := TIME_TO_INT (Retract_time_temp);//czas Retract_T
+			//stValues.description := CONCAT(description_Retract_T,deviceName);
+			
+			//tworzenie pliku JSON
+			fbJson.ResetDocument();
+		
+			fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ValveTravelTime_DataModel', SIZEOF(stValues), ADR(stValues));
+	
+			fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+			Retract_T_Json := sJsonDocument;
+			Retract_T_publishMQTT := TRUE;
+			nRetState := 0;
+		999:
+			//Obsluga bledow 
+		END_CASE
+		
+		//Watchdog 5 sekund, restart sekwencji do odpowiedniego kroku
+		IF WatchDog_RetState_ton.ET > T#5S THEN
+			nExtState := 0;
+		END_IF
+		
+		CmdExt_time_ton(PT:=T#20S);
+		Extend_time_ton(PT:=T#20S);
+		CmdRet_time_ton(PT:=T#20S);
+		Retract_time_ton(PT:=T#20S);
+		WatchDog_ExtState_ton(PT:=T#20S);
+		WatchDog_RetState_ton(PT:=T#20S);
+
+ELSE
+		ExtCmd_T_publishMQTT := FALSE;
+		Extend_T_publishMQTT := FALSE;
+		RetCmd_T_publishMQTT := FALSE;
+		Retract_T_publishMQTT := FALSE;
+END_IF		
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

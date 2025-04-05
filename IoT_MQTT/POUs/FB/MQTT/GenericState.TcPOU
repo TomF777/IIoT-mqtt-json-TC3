@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="GenericState" Id="{ff519a79-22ab-45b2-84ef-736d8c8fe6fd}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK GenericState
+VAR_INPUT
+	LineName	: STRING(40);
+	MachineName : STRING(40);
+	StateName	: STRING(40);
+	TimeStamp	: ULINT;
+	Value		: INT;	 
+	Enable		: BOOL; 		//enable state evaluation
+END_VAR
+VAR_OUTPUT
+	// Topic
+	MqttTopic : STRING(255);
+	
+	// JSON payload
+	MqttJsonPayload : STRING(2000);
+	
+	// Publish command
+	PublishMQTT : BOOL;
+END_VAR
+VAR
+	SetParameter : BOOL := TRUE;	
+	
+	// JSON document
+  	fbJson			: FB_JsonSaxWriter;
+	fbJsonDataType	: FB_JsonReadWriteDataType;
+	sJsonDocument	: STRING(4000);
+	stValues		: SingleState_DataModel;	
+
+	// temporary mqtt topic
+	TopicString : STRING;
+	
+	// safety watchdog
+	tonWatchdog : TON;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(*
+This FB evaluates any state value and sends it by mqtt
+*) 
+
+IF Enable THEN
+	
+	IF SetParameter THEN
+		SetParameter := FALSE;
+		// create mqtt topic
+		TopicString := CONCAT(LineName, MachineName);
+		TopicString := INSERT(TopicString,'/',LEN(TopicString)-LEN(machineName));
+		TopicString := CONCAT(TopicString, StateName);
+		TopicString := INSERT(TopicString,'/',LEN(TopicString)-LEN(StateName));
+		MqttTopic := TopicString;
+		// constant entry in json payload
+		stValues.LineName := LineName;
+		stValues.MachineName := MachineName;
+		stValues.StateName := StateName;
+	END_IF
+	
+	stValues.TimeStamp := TimeStamp;
+	stValues.StateValue := Value;
+		
+	// create JSON message
+	fbJson.ResetDocument();
+	fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'SingleState_DataModel', SIZEOF(stValues), ADR(stValues));
+	fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+	MqttJsonPayload := sJsonDocument;
+	PublishMQTT := TRUE;
+ELSE
+	PublishMQTT := FALSE;
+END_IF;
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

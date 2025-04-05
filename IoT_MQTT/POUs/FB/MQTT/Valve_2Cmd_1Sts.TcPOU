@@ -1,0 +1,199 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="Valve_2Cmd_1Sts" Id="{d4dc27b6-6e80-4b0c-afa4-260af1917557}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK Valve_2Cmd_1Sts
+VAR_INPUT
+	WorkCenter: STRING(40);
+	LineName: STRING(40);
+	PlantCode: STRING(40);
+	MachineName: STRING(40);
+	StationName: STRING(40);
+	DeviceName: STRING(40);
+	Valve_Ret_Cmd: BOOL;
+	Valve_Ret_Sts: BOOL;
+	TimeStamp: ULINT;
+	Enable: BOOL;
+END_VAR
+VAR_OUTPUT
+	/// Time 
+	Valve_CmdExt_T_Out: INT;
+	Valve_CmdRet_T_Out: INT;
+	/// JSON 
+	ExtCmd_T_Json: STRING(4000);
+	RetCmd_T_Json: STRING(4000);
+	/// Publish Command 
+	ExtCmd_T_publishMQTT: BOOL;
+	RetCmd_T_publishMQTT: BOOL;
+	///Topic
+	ExtCmd_T_sTopicPup: STRING(255);
+	RetCmd_T_sTopicPup: STRING(255);
+END_VAR
+VAR
+	/// Case State 
+	nRetState_Deactivate: INT;
+	nRetState_Activate: INT;
+	/// TON 
+	CmdExt_time_ton: TON;
+	CmdRet_time_ton: TON;
+	WatchDog_RetractActivate_ton: TON;
+	WatchDog_RetractDeactivate_ton: TON;
+	CmdExt_time_temp: TIME;
+	CmdRet_time_temp: TIME;
+	/// RTrig 
+	RTrig_RetCMD: R_TRIG;
+	FTrig_RetCMD: F_TRIG;
+	/// UNIX Time 
+	timestampMilliseconds: ULINT;
+	/// JSON document 
+	fbJson: FB_JsonSaxWriter;
+	fbJsonDataType: FB_JsonReadWriteDataType;
+	sJsonDocument: STRING(4000);
+	stValues: ValveTravelTime_DataModel;
+	/// Data structure String  
+	tagName_ExtCmd_T: STRING := 'ExtCmd_T';
+	tagName_RetCmd_T: STRING := 'RetCmd_T';
+	description_ExtCmd_T: STRING := 'Extend Command Time ';
+	description_RetCmd_T: STRING := 'Retract Command Time ';
+	/// Topic 
+	temp_string01: STRING;
+	temp_string02: STRING;
+	bSetParameter: BOOL := TRUE;
+	topicPart_ExtCmd_T: STRING := 'ExtCmd_T';
+	topicPart_RetCmd_T: STRING := 'RetCmd_T';
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF Enable THEN		
+		
+		//detect rising edge ar retract command
+		RTrig_RetCMD(CLK:=Valve_Ret_Cmd);
+		
+		//detect falling edge at retract command
+		FTrig_RetCMD(CLK:=Valve_Ret_Cmd);
+		
+		// prepare topic
+		IF bSetParameter THEN
+			bSetParameter := FALSE;
+			(* topic *)
+			temp_string01 := CONCAT(LineName, MachineName);
+			temp_string01 := INSERT(temp_string01,'/',LEN(temp_string01)-LEN(MachineName));
+			temp_string01 := CONCAT(temp_string01, stationName);
+			temp_string01 := INSERT(temp_string01,'/',LEN(temp_string01)-LEN(StationName));
+			temp_string01 := CONCAT(temp_string01, deviceName);
+			temp_string01 := INSERT(temp_string01,'/',LEN(temp_string01)-LEN(DeviceName));
+			
+			(* Constant String in JSON *)
+			stValues.WorkCenter := WorkCenter;
+			stValues.PlantCode 	:= PlantCode;
+			stValues.LineName 	:= LineName;
+			stValues.MachineName := MachineName;
+			stValues.StationName := StationName;
+			stValues.ValveName  := DeviceName;
+		END_IF
+		
+		//actuator activation
+		CASE nRetState_Activate OF
+		0:
+			//init
+			CmdRet_time_ton.IN  				:= FALSE;
+			WatchDog_RetractActivate_ton.IN  	:= FALSE;
+			RetCmd_T_publishMQTT 				:= FALSE;
+			
+			IF RTrig_RetCMD.Q THEN
+				CmdRet_time_ton.IN := TRUE; 								//start timer CmdRet_time
+				WatchDog_RetractActivate_ton.IN := TRUE; 					//sequence watchdog
+				nRetState_Activate := nRetState_Activate + 10;
+			END_IF
+		10:
+			nRetState_Activate := nRetState_Activate + 10;
+		20:
+			//detect feedback RetSts
+			IF Valve_Ret_Sts THEN
+				CmdRet_time_ton.IN := FALSE;						// stop timer
+				stValues.timeStamp := TimeStamp; 					// assign timeStamp for RetCmd_T
+				CmdRet_time_temp := CmdRet_time_ton.ET; 			// time RetCmd_T
+				nRetState_Activate := nRetState_Activate + 10;
+			END_IF
+		30:
+			Valve_CmdRet_T_Out := TIME_TO_INT(CmdRet_time_temp);	//time RetCmd_T
+			
+			//Init JSON message
+			temp_string02 := CONCAT(temp_string01, topicPart_RetCmd_T);
+			RetCmd_T_sTopicPup := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_RetCmd_T)); 
+			stValues.TimeType := tagName_RetCmd_T;
+			stValues.TimeValue := TIME_TO_INT (CmdRet_time_temp);
+			
+			//create JSON message
+			fbJson.ResetDocument();
+			fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ValveTravelTime_DataModel', SIZEOF(stValues), ADR(stValues));
+			fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+			RetCmd_T_Json := sJsonDocument;
+			RetCmd_T_publishMQTT := TRUE;
+			nRetState_Activate := 0;
+ 
+		END_CASE
+		
+		// sequence watchdog
+		IF WatchDog_RetractActivate_ton.ET > T#5S THEN
+			nRetState_Activate := 0;
+		END_IF
+		
+		//actuator deactivation
+		CASE nRetState_Deactivate OF
+		0:
+			//init
+			CmdExt_time_ton.IN  := FALSE;
+			WatchDog_RetractDeactivate_ton.IN := FALSE;
+			ExtCmd_T_publishMQTT := FALSE;
+		
+			IF (FTrig_RetCMD.Q) THEN
+				CmdExt_time_ton.IN := TRUE; 								// start timer CmdRet_time
+				WatchDog_RetractDeactivate_ton.IN := TRUE; 					// sequence watchdog
+				nRetState_Deactivate := nRetState_Deactivate + 10;
+			END_IF
+		10:
+			nRetState_Deactivate := nRetState_Deactivate + 10;
+		20:
+			// detect no feedback RetSts 
+			IF NOT Valve_Ret_Sts THEN
+				CmdExt_time_ton.IN := FALSE;
+				stValues.timeStamp := TimeStamp; 							//assign timeStamp for RetCmd_T
+				CmdExt_time_temp := CmdExt_time_ton.ET;
+				nRetState_Deactivate := nRetState_Deactivate + 10;	
+			END_IF
+		30:
+			Valve_CmdExt_T_Out := TIME_TO_INT(CmdExt_time_temp);
+			//init JSON messsage
+			temp_string02 := CONCAT(temp_string01, topicPart_ExtCmd_T);
+			ExtCmd_T_sTopicPup := INSERT(temp_string02,'/',LEN(temp_string02)-LEN(topicPart_ExtCmd_T)); 
+			stValues.TimeType := tagName_ExtCmd_T;
+			stValues.TimeValue := TIME_TO_INT (CmdExt_time_temp);
+
+			//create JSON message
+ 			fbJson.ResetDocument();
+			fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'ValveTravelTime_DataModel', SIZEOF(stValues), ADR(stValues));
+			fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+			ExtCmd_T_Json := sJsonDocument;
+			ExtCmd_T_publishMQTT := TRUE;
+			nRetState_Deactivate := 0;
+
+		999:
+			//Obsluga bledow 
+		END_CASE
+		
+		// sequence watchdog
+		IF WatchDog_RetractDeactivate_ton.ET > T#5S THEN
+			nRetState_Deactivate := 0;
+		END_IF
+		
+		CmdExt_time_ton(PT:=T#20S);
+		CmdRet_time_ton(PT:=T#20S);
+	
+ELSE
+		ExtCmd_T_publishMQTT := FALSE;
+		RetCmd_T_publishMQTT := FALSE;
+END_IF		
+]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
