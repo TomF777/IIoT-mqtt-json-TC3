@@ -22,16 +22,18 @@ PRG_09_PlcDiagnostic();
 
 
 tonRecycle5sec(IN:=NOT tonRecycle5sec.Q, PT:=T#5S);
-tonRecycle100ms(IN:=NOT tonRecycle100ms.Q, PT:=T#100MS);
+tonRecycle100ms(IN:=NOT tonRecycle100ms.Q, PT:=T#500MS);
 
-// 100 ms cycle monitoring
+// 500 ms cycle monitoring
 IF tonRecycle100ms.Q THEN
 	PRG_11_AirFlowAnalytics();
+	
 END_IF
 
 // slow process values monitoring
 IF tonRecycle5sec.Q THEN
 	PRG_10_TempHumidAnalytics();
+	PRG_12_OilContaminationAnalytics();
 END_IF
 
 

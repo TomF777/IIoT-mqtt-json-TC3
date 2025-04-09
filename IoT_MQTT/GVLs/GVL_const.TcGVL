@@ -51,6 +51,8 @@ VAR_GLOBAL
 	// electrical devices  - continous operation 
 	ElecDevice3 		: STRING 		:= 'ElecDevice3';
 	
+	DiffPressSensor1	: STRING		:= 'DiffPressSensor1';
+	
 END_VAR]]></Declaration>
   </GVL>
 </TcPlcObject>

@@ -28,7 +28,7 @@ VAR
 	SetParameter 		: BOOL := TRUE;
 	
 	// state machine
-	nState				: INT := -1;
+	nState				: INT := 0;
 	
 	// JSON document
   	fbJson				: FB_JsonSaxWriter;
@@ -42,11 +42,7 @@ VAR
 	// motor status 
 	rtrigMotorState		: R_TRIG;
 	ftrigMotorState		: F_TRIG;
-	
-	// enable status edge detection
-	rtrigEnableStatus	: R_TRIG;
-	ftrigEnableStatus	: F_TRIG;
- 
+	 
 	// safety watchdog
 	tonWatchdog 		: TON;
 	
@@ -70,6 +66,7 @@ are accumulated and will be sent as JSON payload via MQTT at falling
 edge of the motor state.
 Vibration sensor needs to be located ar the motor or its gearing/coupling 
 *)
+
 IF SetParameter THEN
 	SetParameter := FALSE;
 	// create mqtt topic
@@ -85,104 +82,108 @@ IF SetParameter THEN
 	stValues.SensorName := SensorName;
 END_IF
 
-rtrigEnableStatus(CLK:=Enable);
 
-// evaluate analytics & sequence only when Enable = true
-IF rtrigEnableStatus.Q THEN
-	nState := 0;
-END_IF;
-
-// disable analytics
-IF ftrigEnableStatus.Q THEN
-	nState := -1;
-END_IF
 
 // detect motor state (running/stopped)
 rtrigMotorState(CLK:=MotorState);
 ftrigMotorState(CLK:=MotorState);
 
-CASE nState OF
-0:
-	StoppingCntr 	:= 0;
-	StoppedCntr 	:= 0;
-	RunningState 	:= FALSE;
-	StoppingState 	:= FALSE;
-	StoppedState 	:= FALSE;
-	stValues.VibAccelTotRmsX := 0.0;
-	stValues.VibAccelTotRmsY := 0.0;
-	stValues.VibAccelTotRmsZ := 0.0;
+IF ENABLE THEN
+	CASE nState OF
+	0:
+		ClearData();
+		
+		IF rtrigMotorState.Q THEN
+			tonWatchdog.IN := TRUE;
+			nState := 10;
+		END_IF
+		
+	10:
+	// RUNNING
+		RunningState := TRUE;
+		stValues.TimeStamp := TimeStamp;
+		stValues.VibAccelTotRmsX := stValues.VibAccelTotRmsX + VibAccelX;
+		stValues.VibAccelTotRmsY := stValues.VibAccelTotRmsY + VibAccelY;
+		stValues.VibAccelTotRmsZ := stValues.VibAccelTotRmsZ + VibAccelZ;
+		stValues.SensorTemperature := SensorTemperature;
 	
-	PublishMQTT := FALSE;
+		IF ftrigMotorState.Q THEN
+			RunningState := FALSE;
+			nState := 20;
+		END_IF
 	
-	IF rtrigMotorState.Q THEN
-		tonWatchdog.IN := TRUE;
-		nState := 10;
-	END_IF
+	20:
+	// STOPPING
+		StoppingState := TRUE;
+		stValues.TimeStamp := TimeStamp;
+		stValues.VibAccelTotRmsX := stValues.VibAccelTotRmsX + VibAccelX;
+		stValues.VibAccelTotRmsY := stValues.VibAccelTotRmsY + VibAccelY;
+		stValues.VibAccelTotRmsZ := stValues.VibAccelTotRmsZ + VibAccelZ;
+		stValues.SensorTemperature := SensorTemperature;
+		
+		StoppingCntr := StoppingCntr + 1;
+		
+		IF StoppingCntr = 2 THEN
+			StoppingState := FALSE;
+			nState := 30;
+		END_IF
 	
-10:
-// RUNNING
-	RunningState := TRUE;
-	stValues.TimeStamp := TimeStamp;
-	stValues.VibAccelTotRmsX := stValues.VibAccelTotRmsX + VibAccelX;
-	stValues.VibAccelTotRmsY := stValues.VibAccelTotRmsY + VibAccelY;
-	stValues.VibAccelTotRmsZ := stValues.VibAccelTotRmsZ + VibAccelZ;
-	stValues.SensorTemperature := SensorTemperature;
-
-	IF ftrigMotorState.Q THEN
-		RunningState := FALSE;
-		nState := 20;
-	END_IF
-
-20:
-// STOPPING
-	StoppingState := TRUE;
-	stValues.TimeStamp := TimeStamp;
-	stValues.VibAccelTotRmsX := stValues.VibAccelTotRmsX + VibAccelX;
-	stValues.VibAccelTotRmsY := stValues.VibAccelTotRmsY + VibAccelY;
-	stValues.VibAccelTotRmsZ := stValues.VibAccelTotRmsZ + VibAccelZ;
-	stValues.SensorTemperature := SensorTemperature;
+	30:
+	// STOPPED
+		StoppedState := TRUE;
+		stValues.TimeStamp := TimeStamp;
+		stValues.VibAccelTotRmsX := ROUND(stValues.VibAccelTotRmsX + VibAccelX, 4);
+		stValues.VibAccelTotRmsY := ROUND(stValues.VibAccelTotRmsY + VibAccelY, 4);
+		stValues.VibAccelTotRmsZ := ROUND(stValues.VibAccelTotRmsZ + VibAccelZ, 4);
+		stValues.SensorTemperature := ROUND(SensorTemperature, 2);
+		
+		//create JSON message
+		fbJson.ResetDocument();
+		fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'VibAccelarationDataModel', SIZEOF(stValues), ADR(stValues));
+		fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
+		MqttJsonPayload := sJsonDocument;
 	
-	StoppingCntr := StoppingCntr + 1;
+		StoppedCntr := StoppedCntr + 1;
+		
+		IF StoppedCntr = 2 THEN
+			StoppedState := FALSE;
+			PublishMQTT := TRUE;
+			nState := 0;
+		END_IF
+		
+		tonWatchdog.IN := FALSE;
+		
+	END_CASE
 	
-	IF StoppingCntr = 2 THEN
-		StoppingState := FALSE;
-		nState := 30;
-	END_IF
-
-30:
-// STOPPED
-	StoppedState := TRUE;
-	stValues.TimeStamp := TimeStamp;
-	stValues.VibAccelTotRmsX := ROUND(stValues.VibAccelTotRmsX + VibAccelX, 4);
-	stValues.VibAccelTotRmsY := ROUND(stValues.VibAccelTotRmsY + VibAccelY, 4);
-	stValues.VibAccelTotRmsZ := ROUND(stValues.VibAccelTotRmsZ + VibAccelZ, 4);
-	stValues.SensorTemperature := ROUND(SensorTemperature, 2);
-	
-	//create JSON message
-	fbJson.ResetDocument();
-	fbJsonDataType.AddJsonValueFromSymbol(fbJson, 'VibAccelarationDataModel', SIZEOF(stValues), ADR(stValues));
-	fbJson.CopyDocument(sJsonDocument, SIZEOF(sJsonDocument));
-	MqttJsonPayload := sJsonDocument;
-
-	StoppedCntr := StoppedCntr + 1;
-	
-	IF StoppedCntr = 2 THEN
-		StoppedState := FALSE;
-		PublishMQTT := TRUE;
+	//Watchdog 7 seconds, restart of sequence
+	IF tonWatchdog.ET > T#7S AND nState <> 0 THEN
 		nState := 0;
 	END_IF
-	
+ELSE
 	tonWatchdog.IN := FALSE;
-	
-END_CASE
-
-//Watchdog 5 seconds, restart of sequence
-IF tonWatchdog.ET > T#7S THEN
-	nState := 0;
+	ClearData();
 END_IF
 
-tonWatchdog(PT:=T#10S);
-]]></ST>
+	tonWatchdog(PT:=T#10S);]]></ST>
     </Implementation>
+    <Method Name="ClearData" Id="{c962942d-7f03-44a4-bea1-8a76882364e7}">
+      <Declaration><![CDATA[METHOD ClearData
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[nState			:= 0;
+StoppingCntr 	:= 0;
+StoppedCntr 	:= 0;
+RunningState 	:= FALSE;
+StoppingState 	:= FALSE;
+StoppedState 	:= FALSE;
+stValues.VibAccelTotRmsX := 0.0;
+stValues.VibAccelTotRmsY := 0.0;
+stValues.VibAccelTotRmsZ := 0.0;
+
+PublishMQTT := FALSE;]]></ST>
+      </Implementation>
+    </Method>
   </POU>
 </TcPlcObject>

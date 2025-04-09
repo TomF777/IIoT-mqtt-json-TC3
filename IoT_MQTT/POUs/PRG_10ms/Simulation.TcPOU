@@ -31,6 +31,9 @@ VAR
 	
 	ElecSample1				: INT;
 	ElecSample2				: INT;
+	ElecCurrentOffsetL1		: REAL;
+	ElecCurrentOffsetL2		: REAL;	
+	ElecCurrentOffsetL3		: REAL;
 	ElCurrentL1Base			: ARRAY[1..2] OF ARRAY[1..100] OF REAL := 
 								[
 								[0, 0, 0.1, 0.3, 0.45, 0.60, 0.70, 0.80, 0.95, 1.1, 1.3, 1.4, 1.55, 1.6, 1.59,1.55, 
@@ -129,9 +132,9 @@ END_VAR
 			  
 	AirValve[2](StartSim			:= TRUE, 
 			    ExtendCmdTime		:= T#50MS,
-			    ExtendTime 			:= T#150MS,
+			    ExtendTime 			:= T#180MS,
 			    RetractCmdTime 		:= T#50MS,
-			    RetractTime  		:= T#160MS);
+			    RetractTime  		:= T#145MS);
 				
 	AirValve[3](StartSim			:= TRUE, 
 			    ExtendCmdTime		:= T#100MS,
@@ -180,21 +183,30 @@ END_VAR
 	// simulate electrical current curve of motor 1
 	IF GVL_Visu.MotorRunning[1] THEN
 		ElecSample1 := ElecSample1+1;
-		ElecSample1 := SEL(ElecSample1=100, ElecSample1, 1);
-		GVL_Visu.ElCurrentL1[1] := 	ElCurrentL1Base[1][ElecSample1];
-		GVL_Visu.ElCurrentL2[1] := 	ElCurrentL2Base[1][ElecSample1];
-		GVL_Visu.ElCurrentL3[1] := 	ElCurrentL3Base[1][ElecSample1];
+		ElecSample1 := SEL(ElecSample1=60, ElecSample1, 1);
+		IF ElecSample1 < 20 OR ElecSample1 > 40 THEN
+			ElecCurrentOffsetL1 := RDM(0.67) * 0.05;
+			ElecCurrentOffsetL2 := RDM(0.23) * 0.05;
+			ElecCurrentOffsetL3 := RDM(0.72) * 0.05;
+		ELSE
+			ElecCurrentOffsetL1 := RDM(0.31) * 0.05;
+			ElecCurrentOffsetL2 := RDM(0.63) * 0.05;
+			ElecCurrentOffsetL3 := RDM(0.46) * 0.05;
+		END_IF
+		GVL_Visu.ElCurrentL1[1] := 	ElCurrentL1Base[1][ElecSample1] + ElecCurrentOffsetL1;
+		GVL_Visu.ElCurrentL2[1] := 	ElCurrentL2Base[1][ElecSample1] + ElecCurrentOffsetL2;
+		GVL_Visu.ElCurrentL3[1] := 	ElCurrentL3Base[1][ElecSample1] + ElecCurrentOffsetL3;
 	ELSE
 		ElecSample1 := 0;
 		GVL_Visu.ElCurrentL1[1] := 0;
-		GVL_Visu.ElCurrentL1[1] := 0;
-		GVL_Visu.ElCurrentL1[1] := 0;
+		GVL_Visu.ElCurrentL2[1] := 0;
+		GVL_Visu.ElCurrentL3[1] := 0;
 	END_IF
 	
 	// simulate electrical current curve of motor 2
 	IF GVL_Visu.MotorRunning[2] THEN
 		ElecSample2 := ElecSample2+1;
-		ElecSample2 := SEL(ElecSample2=100, ElecSample2, 1);
+		ElecSample2 := SEL(ElecSample2=60, ElecSample2, 1);
 		GVL_Visu.ElCurrentL1[2] := 	ElCurrentL1Base[2][ElecSample2];
 		GVL_Visu.ElCurrentL2[2] := 	ElCurrentL2Base[2][ElecSample2];
 		GVL_Visu.ElCurrentL3[2] := 	ElCurrentL3Base[2][ElecSample2];
@@ -208,6 +220,9 @@ END_VAR
 	// simulate ambient temperature & humidity
 	GVL_Visu.AmbientTemperature := 19.0 + 2* RDM(0.7);
 	GVL_Visu.AmbientHumidity	:= 60.0 + 3 * RDM(0.5);
+	
+	// simulate pressure difference for oil contamination sensor
+	GVL_Visu.OilDiffPressure := 0.2 + RDM(0.1) * 0.2;
   
 
 ELSE

@@ -58,7 +58,7 @@ GVL_SW.AmbientHumiditySensor :=  UINT_TO_REAL(SHL(GVL_HW.IoLinkNode2Ch2_Humidity
 													
 													
 GVL_SW.LevelSensor			:=	TO_REAL(GVL_HW.IoLinkNode2Ch3_Level) / 1000.0;			// convert to m with 1mm resolution
-GVL_SW.DiffSensor			:= 	TO_REAL(GVL_HW.IoLinkNode2Ch4_DiffPress) / 10;			// convert to bar with 0.1 bar resolution
+GVL_SW.DiffPressSensor		:= 	TO_REAL(GVL_HW.IoLinkNode2Ch4_DiffPress) / 10;			// convert to bar with 0.1 bar resolution
 
 // Profinet IO-device data
 GVL_SW.PnIoDevice_32Word_In 	:= GVL_HW.PnIoDevice_32Word_In;

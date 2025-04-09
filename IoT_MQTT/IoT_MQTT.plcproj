@@ -219,6 +219,9 @@
     <Compile Include="POUs\PRG_10ms\PRG_11_AirFlowAnalytics.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\PRG_10ms\PRG_12_OilContaminationAnalytics.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\PRG_10ms\Simulation.TcPOU">
       <SubType>Code</SubType>
     </Compile>

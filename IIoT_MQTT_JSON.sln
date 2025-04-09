@@ -5,8 +5,6 @@ VisualStudioVersion = 15.0.28010.2050
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{B1E792BE-AA5F-4E3C-8C82-674BF9C0715B}") = "IIoT_ProductionLine", "IIoT_ProductionLine.tsproj", "{609397BE-6C3A-4A61-9E59-5CBD51EF45B6}"
 EndProject
-Project("{FD9F1D59-E000-42F3-8744-88DE1BE93C06}") = "IIoT-Scope", "..\IIoT-Scope\IIoT-Scope.tcmproj", "{C37233E7-B8C1-4A51-9710-E5657CC782FE}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|TwinCAT CE7 (ARMV7) = Debug|TwinCAT CE7 (ARMV7)
@@ -57,16 +55,6 @@ Global
 		{F5F07BB2-8108-4363-9BAD-7A572E185B6F}.Release|TwinCAT RT (x64).Build.0 = Release|TwinCAT RT (x64)
 		{F5F07BB2-8108-4363-9BAD-7A572E185B6F}.Release|TwinCAT RT (x86).ActiveCfg = Release|TwinCAT RT (x86)
 		{F5F07BB2-8108-4363-9BAD-7A572E185B6F}.Release|TwinCAT RT (x86).Build.0 = Release|TwinCAT RT (x86)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Debug|TwinCAT CE7 (ARMV7).ActiveCfg = Debug|TwinCAT CE7 (ARMV7)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Debug|TwinCAT OS (ARMT2).ActiveCfg = Debug|TwinCAT OS (ARMT2)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Debug|TwinCAT OS (x64).ActiveCfg = Debug|TwinCAT OS (x64)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Debug|TwinCAT RT (x64).ActiveCfg = Debug|TwinCAT RT (x64)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Debug|TwinCAT RT (x86).ActiveCfg = Debug|TwinCAT RT (x86)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Release|TwinCAT CE7 (ARMV7).ActiveCfg = Release|TwinCAT CE7 (ARMV7)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Release|TwinCAT OS (ARMT2).ActiveCfg = Release|TwinCAT OS (ARMT2)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Release|TwinCAT OS (x64).ActiveCfg = Release|TwinCAT OS (x64)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Release|TwinCAT RT (x64).ActiveCfg = Release|TwinCAT RT (x64)
-		{C37233E7-B8C1-4A51-9710-E5657CC782FE}.Release|TwinCAT RT (x86).ActiveCfg = Release|TwinCAT RT (x86)
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

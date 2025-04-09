@@ -62,7 +62,7 @@ VAR_GLOBAL
 	LevelSensor					: REAL;			// [m]
 	
 	(* Contamination sensor (diff. pressure sensor *)
-	DiffSensor					: REAL;			// [bar]
+	DiffPressSensor				: REAL;			// [bar]
 	
 	
 	(* TimeStamp *)

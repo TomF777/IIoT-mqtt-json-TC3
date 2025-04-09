@@ -18,15 +18,6 @@
 			</Format>
 		</DataType>
 		<DataType>
-			<Name GUID="{AD55499D-583F-6E21-3376-A8B0BA3E2897}" IecBaseType="true" AutoDeleteType="true">ARRAY [1..2] OF USINT</Name>
-			<BitSize>16</BitSize>
-			<BaseType GUID="{18071995-0000-0000-0000-000000000002}">USINT</BaseType>
-			<ArrayInfo>
-				<LBound>1</LBound>
-				<Elements>2</Elements>
-			</ArrayInfo>
-		</DataType>
-		<DataType>
 			<Name GUID="{63C918EA-42ED-5FBE-9620-5753378E88A3}" IecBaseType="true" AutoDeleteType="true">ARRAY [0..31] OF WORD</Name>
 			<BitSize>512</BitSize>
 			<BaseType GUID="{18071995-0000-0000-0000-000000000004}">WORD</BaseType>
@@ -51,6 +42,15 @@
 			<ArrayInfo>
 				<LBound>0</LBound>
 				<Elements>10</Elements>
+			</ArrayInfo>
+		</DataType>
+		<DataType>
+			<Name GUID="{AD55499D-583F-6E21-3376-A8B0BA3E2897}" IecBaseType="true" AutoDeleteType="true">ARRAY [1..2] OF USINT</Name>
+			<BitSize>16</BitSize>
+			<BaseType GUID="{18071995-0000-0000-0000-000000000002}">USINT</BaseType>
+			<ArrayInfo>
+				<LBound>1</LBound>
+				<Elements>2</Elements>
 			</ArrayInfo>
 		</DataType>
 		<DataType>
@@ -1551,15 +1551,11 @@ Time at the client when the reply arrived from the server;]]></Comment>
 		</System>
 		<Plc>
 			<Project GUID="{F5F07BB2-8108-4363-9BAD-7A572E185B6F}" Name="IoT_MQTT" PrjFilePath="IoT_MQTT\IoT_MQTT.plcproj" TmcFilePath="IoT_MQTT\IoT_MQTT.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IoT_MQTT\IoT_MQTT.tmc" TmcHash="{7CEE023D-DA47-63BA-4673-E7F578D5C8DB}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IoT_MQTT\IoT_MQTT.tmc" TmcHash="{2C372B41-D8D1-1342-1B5D-E9537ADE54D5}">
 					<Name>IoT_MQTT Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1" ContextId="1" AreaNo="16">
 						<Name>PlcTask_10ms Inputs</Name>
-						<Var>
-							<Name>GVL_HW.IoLinkNode2Ch2_Temperature</Name>
-							<Type GUID="{AD55499D-583F-6E21-3376-A8B0BA3E2897}">ARRAY [1..2] OF USINT</Type>
-						</Var>
 						<Var>
 							<Name>GVL_HW.PnIoDevice_32Word_In</Name>
 							<Comment><![CDATA[ Input Data from Profinet IO-Device]]></Comment>
@@ -1709,6 +1705,10 @@ Time at the client when the reply arrived from the server;]]></Comment>
 							<Name>GVL_HW.IoLinkNode2Ch1_Pressure</Name>
 							<Comment><![CDATA[ [bar]]]></Comment>
 							<Type>REAL</Type>
+						</Var>
+						<Var>
+							<Name>GVL_HW.IoLinkNode2Ch2_Temperature</Name>
+							<Type GUID="{AD55499D-583F-6E21-3376-A8B0BA3E2897}">ARRAY [1..2] OF USINT</Type>
 						</Var>
 						<Var>
 							<Name>GVL_HW.IoLinkNode2Ch2_Humidity</Name>
@@ -88309,6 +88309,7 @@ Bit1: Value smaller than Limit2]]></Comment>
 				<Link VarA="PlcTask_10ms Inputs^GVL_HW.IoLinkNode2Ch2_Temperature[1]" VarB="IoLinkNode2_Ch2 (IO-Link Slave)^IO-Link Port2^Port2: process data[0]"/>
 				<Link VarA="PlcTask_10ms Inputs^GVL_HW.IoLinkNode2Ch2_Temperature[2]" VarB="IoLinkNode2_Ch2 (IO-Link Slave)^IO-Link Port2^Port2: process data[1]"/>
 				<Link VarA="PlcTask_10ms Inputs^GVL_HW.IoLinkNode2Ch3_Level" VarB="IoLinkNode2_Ch3 (IO-Link Slave)^IO-Link Port3^Level"/>
+				<Link VarA="PlcTask_10ms Inputs^GVL_HW.IoLinkNode2Ch4_DiffPress" VarB="IoLinkNode2_Ch4 (IO-Link Slave)^IO-Link Port4^Pressure"/>
 			</OwnerB>
 		</OwnerA>
 	</Mappings>
