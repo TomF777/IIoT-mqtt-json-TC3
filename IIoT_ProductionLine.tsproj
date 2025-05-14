@@ -1551,7 +1551,7 @@ Time at the client when the reply arrived from the server;]]></Comment>
 		</System>
 		<Plc>
 			<Project GUID="{F5F07BB2-8108-4363-9BAD-7A572E185B6F}" Name="IoT_MQTT" PrjFilePath="IoT_MQTT\IoT_MQTT.plcproj" TmcFilePath="IoT_MQTT\IoT_MQTT.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IoT_MQTT\IoT_MQTT.tmc" TmcHash="{2C372B41-D8D1-1342-1B5D-E9537ADE54D5}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="IoT_MQTT\IoT_MQTT.tmc" TmcHash="{ABDC620A-F82D-D75F-5ECB-901EE0064B13}">
 					<Name>IoT_MQTT Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Vars VarGrpType="1" ContextId="1" AreaNo="16">
